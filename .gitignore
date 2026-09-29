@@ -7,3 +7,6 @@ dist/
 *.tar
 *.deb
 kubeconfig*
+.venv/
+__pycache__/
+.pytest_cache/
