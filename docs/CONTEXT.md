@@ -1,4 +1,4 @@
-cat > docs/CONTEXT.md << 'EOF'
+
 # Shipyard: Project Context
 Online shop for electronic parts (ESP32, sensors, modules). **UI language: English only.**
 
@@ -18,4 +18,3 @@ React 18, Vite, TypeScript, Tailwind, React Router, vitest. Dockerfile: multi-st
 - Small focused changes, tests for every endpoint/page
 - API errors: {"detail": "..."}; prefix all APIs with /api/<service>/
 - Never hardcode secrets
-EOF
