@@ -34,11 +34,9 @@ user-service:test:
 user-service:build:
   stage: build
   image: docker:27
-  services:
-    - docker:27-dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+  needs:
+    - job: user-service:test
+      optional: true
   script:
     - cd services/user-service
     - >
@@ -74,11 +72,9 @@ frontend:test:
 frontend:build:
   stage: build
   image: docker:27
-  services:
-    - docker:27-dind
-  variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+  needs:
+    - job: frontend:test
+      optional: true
   script:
     - cd frontend
     - docker build -t shipyard-frontend:$CI_COMMIT_SHORT_SHA .
@@ -86,7 +82,7 @@ frontend:build:
     - changes:
         - frontend/**/*
         - .gitlab-ci.yml
-
+        
 # ---------- helm ----------
 
 helm:lint:
