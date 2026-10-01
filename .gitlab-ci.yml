@@ -1,41 +1,105 @@
 stages:
-- test
-- build
+  - test
+  - build
 
 default:
   tags:
-  - local
+    - local
 
 variables:
   PIP_INDEX_URL: "https://pypi.tuna.tsinghua.edu.cn/simple"
   PIP_DEFAULT_TIMEOUT: "120"
   PIP_RETRIES: "10"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
 
-cache:
-  key: pip-user-service
-  paths:
-    - .cache/pip
+# ---------- user-service ----------
+
 user-service:test:
   stage: test
   image: python:3.12-slim
+  cache:
+    key: pip-user-service
+    paths:
+      - .cache/pip
   script:
-  - cd services/user-service
-  - pip install -r requirements-dev.txt
-  - python -m pytest -v
+    - cd services/user-service
+    - pip install -r requirements-dev.txt
+    - python -m pytest -v
   rules:
-  - changes:
-    - services/user-service/**/*
-    - .gitlab-ci.yml
+    - changes:
+        - services/user-service/**/*
+        - .gitlab-ci.yml
 
 user-service:build:
   stage: build
   image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
   script:
-  - cd services/user-service
-  - >
-    docker build --build-arg PIP_INDEX_URL=$PIP_INDEX_URL --build-arg PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT -t user-service:$CI_COMMIT_SHORT_SHA .
+    - cd services/user-service
+    - >
+      docker build
+      --build-arg PIP_INDEX_URL=$PIP_INDEX_URL
+      --build-arg PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT
+      -t user-service:$CI_COMMIT_SHORT_SHA .
   rules:
-  - changes:
-    - services/user-service/**/*
-    - .gitlab-ci.yml
+    - changes:
+        - services/user-service/**/*
+        - .gitlab-ci.yml
+
+# ---------- frontend ----------
+
+frontend:test:
+  stage: test
+  image: node:20-alpine
+  cache:
+    key:
+      files:
+        - frontend/package-lock.json
+    paths:
+      - .cache/npm
+  script:
+    - cd frontend
+    - npm ci
+    - npm test
+  rules:
+    - changes:
+        - frontend/**/*
+        - .gitlab-ci.yml
+
+frontend:build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+  script:
+    - cd frontend
+    - docker build -t shipyard-frontend:$CI_COMMIT_SHORT_SHA .
+  rules:
+    - changes:
+        - frontend/**/*
+        - .gitlab-ci.yml
+
+# ---------- helm ----------
+
+helm:lint:
+  stage: test
+  image:
+    name: alpine/helm:3.16.2
+    entrypoint: [""]
+  script:
+    - helm lint k8s/charts/service -f k8s/values/user-service.yaml
+    - helm lint k8s/charts/service -f k8s/values/frontend.yaml
+    - helm template user-service k8s/charts/service -f k8s/values/user-service.yaml > /dev/null
+    - helm template frontend k8s/charts/service -f k8s/values/frontend.yaml > /dev/null
+  rules:
+    - changes:
+        - k8s/**/*
+        - .gitlab-ci.yml
