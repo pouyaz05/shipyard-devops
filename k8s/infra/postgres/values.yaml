@@ -1,0 +1,8 @@
+image: postgres:16
+storage: 1Gi
+existingSecret: postgres-secret
+databases:
+  - users_db
+resources:
+  requests: {cpu: 100m, memory: 256Mi}
+  limits: {cpu: 500m, memory: 512Mi}
