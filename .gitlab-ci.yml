@@ -28,7 +28,7 @@ variables:
 
 .deploy:
   image:
-    name: alpine/helm:3.16.2
+    name: alpine/helm:helm:4.2.4
     entrypoint: [""]
   # KUBECONFIG باید در Settings > CI/CD > Variables از نوع File تعریف شود
   before_script:
@@ -190,7 +190,7 @@ frontend:deploy-production:
 helm:lint:
   stage: test
   image:
-    name: alpine/helm:3.16.2
+    name: alpine/helm:4.2.4
     entrypoint: [""]
   script:
     - helm lint k8s/charts/service -f k8s/values/user-service.yaml
