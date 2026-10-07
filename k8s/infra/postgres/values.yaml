@@ -3,6 +3,11 @@ storage: 1Gi
 existingSecret: postgres-secret
 databases:
   - users_db
+secretRefs: []
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
 resources:
   requests: {cpu: 100m, memory: 256Mi}
   limits: {cpu: 500m, memory: 512Mi}
