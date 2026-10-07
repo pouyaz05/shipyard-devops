@@ -1,5 +1,6 @@
 replicaCount: 1
-
+imagePullSecrets:
+  - name: gitlab-registry
 image:
   repository: shipyard-frontend
   tag: "dev"
