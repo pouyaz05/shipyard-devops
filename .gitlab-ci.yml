@@ -22,7 +22,7 @@ variables:
   NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
   NS_STAGING: sy
   NS_PRODUCTION: sy-production
-  HELM_OPTS: "--install --rollback-on-failure --timeout 3m"
+  HELM_OPTS: "--install --rollback-on-failure --timeout 3m --force-conflicts"
 
 # ---------- قالب‌های مشترک ----------
 
