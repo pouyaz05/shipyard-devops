@@ -52,3 +52,4 @@ ingress:
   hosts:
     - host: shop.local
       paths: [{ path: /api/user-service , pathType: Prefix }]
+
