@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.routers import auth, health, ping, users
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("user-service")
@@ -18,13 +19,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="user-service", lifespan=lifespan)
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/ready")
-def ready() -> dict[str, str]:
-    return {"status": "ready"}
+app.include_router(health.router)
+app.include_router(ping.router)
+app.include_router(auth.router)
+app.include_router(users.router)
