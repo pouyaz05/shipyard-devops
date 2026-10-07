@@ -3,10 +3,10 @@ kind: Service
 metadata: 
     name: {{ .Release.Name }}
 spec:
-    clusterIp: none
+    clusterIP: None
     selector:
         app: {{ .Release.Name}}
     ports:
-        name: pg 
+      - name: pg 
         port: 5432
         targetPort: 5432

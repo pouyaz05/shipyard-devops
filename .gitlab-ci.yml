@@ -1,6 +1,14 @@
 stages:
   - test
   - build
+  - deploy-staging
+  - deploy-production
+
+# فقط یک pipeline: برای MR یا برای push روی main (جلوگیری از pipeline دوگانه)
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 default:
   tags:
@@ -12,6 +20,27 @@ variables:
   PIP_RETRIES: "10"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
+  NS_STAGING: sy-staging
+  NS_PRODUCTION: sy-production
+  HELM_OPTS: "--install --rollback-on-failure --timeout 3m"
+
+# ---------- قالب‌های مشترک ----------
+
+.deploy:
+  image:
+    name: alpine/helm:3.16.2
+    entrypoint: [""]
+  # KUBECONFIG باید در Settings > CI/CD > Variables از نوع File تعریف شود
+  before_script:
+    - helm version --short
+
+.changes-user-service: &changes-user-service
+  - services/user-service/**/*
+  - .gitlab-ci.yml
+
+.changes-frontend: &changes-frontend
+  - frontend/**/*
+  - .gitlab-ci.yml
 
 # ---------- user-service ----------
 
@@ -27,9 +56,7 @@ user-service:test:
     - pip install -r requirements-dev.txt
     - python -m pytest -v
   rules:
-    - changes:
-        - services/user-service/**/*
-        - .gitlab-ci.yml
+    - changes: *changes-user-service
 
 user-service:build:
   stage: build
@@ -37,19 +64,60 @@ user-service:build:
   needs:
     - job: user-service:test
       optional: true
+  variables:
+    IMAGE: localhost:5001/user-service:$CI_COMMIT_SHORT_SHA
   script:
     - cd services/user-service
     - >
       docker build
       --build-arg PIP_INDEX_URL=$PIP_INDEX_URL
       --build-arg PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT
-      -t user-service:$CI_COMMIT_SHORT_SHA .
+      -t $IMAGE .
+    # smoke test: ایمیج ساخته شده باید بالا بیاید
+    - docker run --rm $IMAGE python -c "import app" || true
+    # push فقط روی main
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+        docker push $IMAGE
+      fi
   rules:
-    - changes:
-        - services/user-service/**/*
-        - .gitlab-ci.yml
+    - changes: *changes-user-service
 
-# ---------- frontend ----------بسیعترسب
+user-service:deploy-staging:
+  extends: .deploy
+  stage: deploy-staging
+  needs: ["user-service:build"]
+  script:
+    - >
+      helm upgrade user-service k8s/charts/service -n $NS_STAGING $HELM_OPTS
+      -f k8s/values/user-service.yaml
+      --set image.repository=localhost:5001/user-service
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-user-service
+
+user-service:deploy-production:
+  extends: .deploy
+  stage: deploy-production
+  needs: ["user-service:deploy-staging"]
+  script:
+    - >
+      helm upgrade user-service k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
+      -f k8s/values/user-service.yaml
+      --set image.repository=localhost:5001/user-service
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-user-service
+      when: manual
+
+# ---------- frontend ----------
 
 frontend:test:
   stage: test
@@ -65,9 +133,7 @@ frontend:test:
     - npm ci
     - npm test
   rules:
-    - changes:
-        - frontend/**/*
-        - .gitlab-ci.yml
+    - changes: *changes-frontend
 
 frontend:build:
   stage: build
@@ -75,15 +141,53 @@ frontend:build:
   needs:
     - job: frontend:test
       optional: true
+  variables:
+    IMAGE: localhost:5001/frontend:$CI_COMMIT_SHORT_SHA
   script:
     - cd frontend
-    - docker build -t shipyard-frontend:$CI_COMMIT_SHORT_SHA .
+    - docker build -t $IMAGE .
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+        docker push $IMAGE
+      fi
   rules:
-    - changes:
-        - frontend/**/*
-        - .gitlab-ci.yml
+    - changes: *changes-frontend
 
-# ---------- helm ----------sdfsdfsdf
+frontend:deploy-staging:
+  extends: .deploy
+  stage: deploy-staging
+  needs: ["frontend:build"]
+  script:
+    - >
+      helm upgrade frontend k8s/charts/service -n $NS_STAGING $HELM_OPTS
+      -f k8s/values/frontend.yaml
+      --set image.repository=localhost:5001/frontend
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-frontend
+
+frontend:deploy-production:
+  extends: .deploy
+  stage: deploy-production
+  needs: ["frontend:deploy-staging"]
+  script:
+    - >
+      helm upgrade frontend k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
+      -f k8s/values/frontend.yaml
+      --set image.repository=localhost:5001/frontend
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-frontend
+      when: manual
+
+# ---------- helm / infra ----------
 
 helm:lint:
   stage: test
@@ -93,9 +197,37 @@ helm:lint:
   script:
     - helm lint k8s/charts/service -f k8s/values/user-service.yaml
     - helm lint k8s/charts/service -f k8s/values/frontend.yaml
+    - helm lint k8s/infra/postgres
     - helm template user-service k8s/charts/service -f k8s/values/user-service.yaml > /dev/null
     - helm template frontend k8s/charts/service -f k8s/values/frontend.yaml > /dev/null
+    - helm template postgres k8s/infra/postgres > /dev/null
   rules:
     - changes:
         - k8s/**/*
         - .gitlab-ci.yml
+
+postgres:deploy-staging:
+  extends: .deploy
+  stage: deploy-staging
+  script:
+    - helm upgrade postgres k8s/infra/postgres -n $NS_STAGING $HELM_OPTS
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - k8s/infra/postgres/**/*
+
+postgres:deploy-production:
+  extends: .deploy
+  stage: deploy-production
+  needs: ["postgres:deploy-staging"]
+  script:
+    - helm upgrade postgres k8s/infra/postgres -n $NS_PRODUCTION $HELM_OPTS
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes:
+        - k8s/infra/postgres/**/*
+      when: manual

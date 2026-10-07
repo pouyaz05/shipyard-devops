@@ -1,43 +1,40 @@
-stages:
-  - test
-  - build
-  - deploy
+replicaCount: 1
 
+image:
+  repository: user-service
+  tag: "dev"
+  pullPolicy: IfNotPresent
 
-.deploy:
-  stage: deploy
-  image:
-    name: alpine/helm:3.16.2
-    entrypoint: [""]
-  script:
-    - >
-      helm upgrade --install $SERVICE k8s/charts/service
-      -f k8s/values/$SERVICE.yaml
-      -n $K8S_NAMESPACE --create-namespace
-      --set image.repository=$CI_REGISTRY_IMAGE/$SERVICE
-      --set image.tag=$CI_COMMIT_SHORT_SHA
-      --atomic --wait --timeout 3m
+service:
+  type: ClusterIP
+  port: 8000
 
-deploy:frontend:staging:
-  extends: .deploy
-  variables:
-    SERVICE: frontend
-    K8S_NAMESPACE: sy-staging
-  environment:
-    name: staging/frontend
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [frontend/**/*, k8s/**/*, .gitlab-ci.yml]
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
 
-deploy:frontend:production:
-  extends: .deploy
-  variables:
-    SERVICE: frontend
-    K8S_NAMESPACE: sy-production
-  environment:
-    name: production/frontend
-  needs: ["deploy:frontend:staging"]
-  rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: [frontend/**/*, k8s/**/*, .gitlab-ci.yml]
-      when: manual
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 5
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
