@@ -20,7 +20,7 @@ variables:
   PIP_RETRIES: "10"
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
   NPM_CONFIG_CACHE: "$CI_PROJECT_DIR/.cache/npm"
-  NS_STAGING: sy-staging
+  NS_STAGING: sy
   NS_PRODUCTION: sy-production
   HELM_OPTS: "--install --rollback-on-failure --timeout 3m"
 
@@ -78,7 +78,6 @@ user-service:build:
     # push فقط روی main
     - |
       if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
-        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
         docker push $IMAGE
       fi
   rules:
@@ -148,7 +147,6 @@ frontend:build:
     - docker build -t $IMAGE .
     - |
       if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
-        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
         docker push $IMAGE
       fi
   rules:
