@@ -36,10 +36,14 @@ variables:
 
 .changes-user-service: &changes-user-service
   - services/user-service/**/*
+  - k8s/charts/service/**/*
+  - k8s/values/user-service.yaml
   - .gitlab-ci.yml
 
 .changes-frontend: &changes-frontend
   - frontend/**/*
+  - k8s/charts/service/**/*
+  - k8s/values/frontend.yaml
   - .gitlab-ci.yml
 
 # ---------- user-service ----------
@@ -86,7 +90,10 @@ user-service:build:
 user-service:deploy-staging:
   extends: .deploy
   stage: deploy-staging
-  needs: ["user-service:build"]
+  needs:
+    - job: user-service:build
+    - job: postgres:deploy-staging
+      optional: true
   script:
     - >
       helm upgrade user-service k8s/charts/service -n $NS_STAGING $HELM_OPTS
@@ -102,7 +109,10 @@ user-service:deploy-staging:
 user-service:deploy-production:
   extends: .deploy
   stage: deploy-production
-  needs: ["user-service:deploy-staging"]
+  needs:
+    - job: user-service:build
+    - job: postgres:deploy-staging
+      optional: true
   script:
     - >
       helm upgrade user-service k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
