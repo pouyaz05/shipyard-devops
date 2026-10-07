@@ -19,13 +19,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
-RUN groupadd --system app && useradd --system --gid app --no-create-home app
+RUN groupadd --system --gid 10001 app \
+ && useradd --system --uid 10001 --gid app --no-create-home app
 
 WORKDIR /app
 COPY --from=builder /opt/venv /opt/venv
+COPY alembic.ini ./
+COPY alembic ./alembic
 COPY app ./app
 
-USER app
+USER 10001
 EXPOSE 8000
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
