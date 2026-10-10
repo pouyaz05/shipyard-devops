@@ -46,6 +46,12 @@ variables:
   - k8s/values/frontend.yaml
   - .gitlab-ci.yml
 
+.changes-product-service: &changes-product-service
+  - services/product-service/**/*
+  - k8s/charts/service/**/*
+  - k8s/values/product-service.yaml
+  - .gitlab-ci.yml
+
 # ---------- user-service ----------
 
 user-service:test:
@@ -109,10 +115,7 @@ user-service:deploy-staging:
 user-service:deploy-production:
   extends: .deploy
   stage: deploy-production
-  needs:
-    - job: user-service:build
-    - job: postgres:deploy-staging
-      optional: true
+  needs: ["user-service:deploy-staging"]
   script:
     - >
       helm upgrade user-service k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
@@ -125,7 +128,79 @@ user-service:deploy-production:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: *changes-user-service
       when: manual
+# ---------- product-service ----------
 
+product-service:test:
+  stage: test
+  image: python:3.12-slim
+  cache:
+    key: pip-product-service
+    paths:
+      - .cache/pip
+  script:
+    - cd services/product-service
+    - pip install -r requirements-dev.txt
+    - python -m pytest -v
+  rules:
+    - changes: *changes-product-service
+
+product-service:build:
+  stage: build
+  image: docker:27
+  needs:
+    - job: product-service:test
+      optional: true
+  variables:
+    IMAGE: localhost:5001/product-service:$CI_COMMIT_SHORT_SHA
+  script:
+    - cd services/product-service
+    - >
+      docker build
+      --build-arg PIP_INDEX_URL=$PIP_INDEX_URL
+      --build-arg PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT
+      -t $IMAGE .
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        docker push $IMAGE
+      fi
+  rules:
+    - changes: *changes-product-service
+
+product-service:deploy-staging:
+  extends: .deploy
+  stage: deploy-staging
+  needs:
+    - job: product-service:build
+    - job: postgres:deploy-staging
+      optional: true
+  script:
+    - >
+      helm upgrade product-service k8s/charts/service -n $NS_STAGING $HELM_OPTS
+      -f k8s/values/product-service.yaml
+      --set image.repository=localhost:5001/product-service
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-product-service
+
+product-service:deploy-production:
+  extends: .deploy
+  stage: deploy-production
+  needs: ["product-service:deploy-staging"]
+  script:
+    - >
+      helm upgrade product-service k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
+      -f k8s/values/product-service.yaml
+      --set image.repository=localhost:5001/product-service
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-product-service
+      when: manual
 # ---------- frontend ----------
 
 frontend:test:
