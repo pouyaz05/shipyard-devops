@@ -18,19 +18,24 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-4">
           <Link to="/" className="text-xl font-bold tracking-tight">
             Shipyard
           </Link>
-          <nav className="flex items-center gap-6">
+          <nav className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <NavLink to="/" end className={linkClass}>
               Home
+            </NavLink>
+            <NavLink to="/products" className={linkClass}>
+              Products
             </NavLink>
             {!isLoading &&
               (user ? (
                 <>
                   <NavLink to="/account" className={linkClass}>
-                    {user.full_name}
+                    <span className="inline-block max-w-[12rem] truncate align-bottom">
+                      {user.email}
+                    </span>
                   </NavLink>
                   <button
                     type="button"

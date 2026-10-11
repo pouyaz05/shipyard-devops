@@ -41,6 +41,7 @@ interface RequestOptions {
   method?: "GET" | "POST";
   body?: unknown;
   auth?: boolean;
+  signal?: AbortSignal;
 }
 
 async function readDetail(response: Response): Promise<string> {
@@ -62,7 +63,10 @@ async function readDetail(response: Response): Promise<string> {
   return `Request failed (${response.status})`;
 }
 
-async function request<T>(path: string, { method = "GET", body, auth = false }: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  { method = "GET", body, auth = false, signal }: RequestOptions = {},
+): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
@@ -70,14 +74,20 @@ async function request<T>(path: string, { method = "GET", body, auth = false }: 
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
+  // Paths starting with /api/ are already complete relative paths (e.g. /api/product-service/...).
+  // Anything else is relative to the user-service base (FE-2 auth calls).
+  const url = path.startsWith("/api/") ? path : `${BASE_URL}${path}`;
+
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
+    response = await fetch(url, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
     throw new ApiError(0, "Network error. Please try again.");
   }
 
@@ -93,7 +103,8 @@ async function request<T>(path: string, { method = "GET", body, auth = false }: 
 }
 
 export const api = {
-  get: <T>(path: string, options: { auth?: boolean } = {}) => request<T>(path, options),
-  post: <T>(path: string, body: unknown, options: { auth?: boolean } = {}) =>
+  get: <T>(path: string, options: { auth?: boolean; signal?: AbortSignal } = {}) =>
+    request<T>(path, options),
+  post: <T>(path: string, body: unknown, options: { auth?: boolean; signal?: AbortSignal } = {}) =>
     request<T>(path, { ...options, method: "POST", body }),
 };
