@@ -52,6 +52,11 @@ variables:
   - k8s/values/product-service.yaml
   - .gitlab-ci.yml
 
+.changes-cart-service: &changes-cart-service
+  - services/cart-service/**/*
+  - k8s/charts/service/**/*
+  - k8s/values/cart-service.yaml
+  - .gitlab-ci.yml
 # ---------- user-service ----------
 
 user-service:test:
@@ -201,6 +206,46 @@ product-service:deploy-production:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       changes: *changes-product-service
       when: manual
+
+# ---------- cart-service ----------
+
+cart-service:test:
+  stage: test
+  image: python:3.12-slim
+  cache:
+    key: pip-cart-service
+    paths:
+      - .cache/pip
+  script:
+    - cd services/cart-service
+    - pip install -r requirements-dev.txt
+    - python -m pytest -v
+  rules:
+    - changes: *changes-cart-service
+
+cart-service:build:
+  stage: build
+  image: docker:27
+  needs:
+    - job: cart-service:test
+      optional: true
+  variables:
+    IMAGE: localhost:5001/cart-service:$CI_COMMIT_SHORT_SHA
+  script:
+    - cd services/cart-service
+    - >
+      docker build
+      --build-arg PIP_INDEX_URL=$PIP_INDEX_URL
+      --build-arg PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT
+      -t $IMAGE .
+    - docker run --rm $IMAGE python -c "import fastapi, sqlalchemy, psycopg, jwt, httpx"
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        docker push $IMAGE
+      fi
+  rules:
+    - changes: *changes-cart-service
+
 # ---------- frontend ----------
 
 frontend:test:
@@ -284,6 +329,8 @@ helm:lint:
     - helm template user-service k8s/charts/service -f k8s/values/user-service.yaml > /dev/null
     - helm template frontend k8s/charts/service -f k8s/values/frontend.yaml > /dev/null
     - helm template postgres k8s/infra/postgres > /dev/null
+    - helm lint k8s/charts/service -f k8s/values/product-service.yaml
+    - helm template product-service k8s/charts/service -f k8s/values/product-service.yaml > /dev/null
   rules:
     - changes:
         - k8s/**/*
