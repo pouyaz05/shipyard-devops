@@ -116,3 +116,11 @@ def delete_product(slug: str, db: Session = Depends(get_db)) -> None:
     product = _get_or_404(db, slug)
     db.delete(product)
     db.commit()
+
+
+@router.get("/by-id/{product_id}", response_model=ProductOut)
+def get_product_by_id(product_id: uuid.UUID, db: Session = Depends(get_db)) -> Product:
+    product = db.get(Product, product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product

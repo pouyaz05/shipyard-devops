@@ -82,3 +82,23 @@ def test_list_categories(client, catalog):
     response = client.get("/api/product-service/categories")
     assert response.status_code == 200
     assert [c["name"] for c in response.json()] == ["Boards", "Sensors"]
+
+
+def test_get_product_by_id(client, catalog):
+    product_id = client.get(f"{BASE}/esp32-devkit").json()["id"]
+    response = client.get(f"{BASE}/by-id/{product_id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["slug"] == "esp32-devkit"
+    assert body["price_cents"] == 900
+    assert body["stock"] == 10
+
+
+def test_get_product_by_id_not_found(client, catalog):
+    response = client.get(f"{BASE}/by-id/00000000-0000-4000-8000-000000000000")
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Product not found"}
+
+
+def test_get_product_by_id_rejects_bad_uuid(client, catalog):
+    assert client.get(f"{BASE}/by-id/not-a-uuid").status_code == 422
