@@ -37,11 +37,16 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions {
-  method?: "GET" | "POST";
-  body?: unknown;
+type Method = "GET" | "POST" | "PATCH" | "DELETE";
+
+interface CallOptions {
   auth?: boolean;
   signal?: AbortSignal;
+}
+
+interface RequestOptions extends CallOptions {
+  method?: Method;
+  body?: unknown;
 }
 
 async function readDetail(response: Response): Promise<string> {
@@ -95,16 +100,22 @@ async function request<T>(
     throw new ApiError(response.status, await readDetail(response));
   }
 
+  // 204 / empty bodies are fine (mutations); anything else must be JSON.
+  const text = await response.text();
+  if (text === "") return undefined as T;
   try {
-    return (await response.json()) as T;
+    return JSON.parse(text) as T;
   } catch {
     throw new ApiError(response.status, "Unexpected response from server.");
   }
 }
 
 export const api = {
-  get: <T>(path: string, options: { auth?: boolean; signal?: AbortSignal } = {}) =>
-    request<T>(path, options),
-  post: <T>(path: string, body: unknown, options: { auth?: boolean; signal?: AbortSignal } = {}) =>
+  get: <T>(path: string, options: CallOptions = {}) => request<T>(path, options),
+  post: <T>(path: string, body: unknown, options: CallOptions = {}) =>
     request<T>(path, { ...options, method: "POST", body }),
+  patch: <T>(path: string, body: unknown, options: CallOptions = {}) =>
+    request<T>(path, { ...options, method: "PATCH", body }),
+  delete: <T>(path: string, options: CallOptions = {}) =>
+    request<T>(path, { ...options, method: "DELETE" }),
 };

@@ -4,13 +4,14 @@ import { productPage } from "../test/fixtures";
 import { jsonResponse, mockFetch, renderApp } from "../test/utils";
 
 describe("Navbar", () => {
-  it("shows Products, Login and Register when logged out", () => {
+  it("shows Products, Cart, Login and Register when logged out", () => {
     mockFetch(() => jsonResponse(200, productPage([])));
     renderApp("/login");
 
     const header = within(screen.getByRole("banner"));
     expect(header.getByRole("link", { name: "Home" })).toBeInTheDocument();
     expect(header.getByRole("link", { name: "Products" })).toBeInTheDocument();
+    expect(header.getByRole("link", { name: "Cart" })).toBeInTheDocument();
     expect(header.getByRole("link", { name: "Login" })).toBeInTheDocument();
     expect(header.getByRole("link", { name: "Register" })).toBeInTheDocument();
     expect(header.queryByRole("button", { name: "Logout" })).not.toBeInTheDocument();

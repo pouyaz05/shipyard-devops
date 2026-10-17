@@ -28,7 +28,7 @@ describe("ProductDetail page", () => {
     renderApp("/products/esp32-devkit");
 
     expect(await screen.findByText("Out of stock")).toBeInTheDocument();
-    expect(screen.queryByText(/available/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/units? available/)).not.toBeInTheDocument();
   });
 
   it("shows a not-found state for a 404", async () => {

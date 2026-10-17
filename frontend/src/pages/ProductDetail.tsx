@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { getProduct } from "../api/products";
+import AddToCartButton from "../cart/AddToCartButton";
 import StockBadge from "../components/StockBadge";
 import { EmptyState, ErrorState, LoadingState } from "../components/StateViews";
 import { useAsyncData } from "../hooks/useAsyncData";
@@ -54,6 +55,7 @@ export default function ProductDetail() {
               </span>
             )}
           </div>
+          <AddToCartButton product={product} className="mt-6 max-w-xs" />
           <p className="mt-6 whitespace-pre-line text-slate-700">
             {product.description || "No description available."}
           </p>
