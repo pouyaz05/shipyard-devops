@@ -246,6 +246,41 @@ cart-service:build:
   rules:
     - changes: *changes-cart-service
 
+cart-service:deploy-staging:
+  extends: .deploy
+  stage: deploy-staging
+  needs:
+    - job: cart-service:build
+    - job: postgres:deploy-staging
+      optional: true
+  script:
+    - >
+      helm upgrade cart-service k8s/charts/service -n $NS_STAGING $HELM_OPTS
+      -f k8s/values/cart-service.yaml
+      --set image.repository=localhost:5001/cart-service
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: staging
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-cart-service
+
+cart-service:deploy-production:
+  extends: .deploy
+  stage: deploy-production
+  needs: ["cart-service:deploy-staging"]
+  script:
+    - >
+      helm upgrade cart-service k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
+      -f k8s/values/cart-service.yaml
+      --set image.repository=localhost:5001/cart-service
+      --set image.tag=$CI_COMMIT_SHORT_SHA
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      changes: *changes-cart-service
+      when: manual
 # ---------- frontend ----------
 
 frontend:test:
@@ -328,6 +363,8 @@ helm:lint:
     - helm lint k8s/infra/postgres
     - helm template user-service k8s/charts/service -f k8s/values/user-service.yaml > /dev/null
     - helm template frontend k8s/charts/service -f k8s/values/frontend.yaml > /dev/null
+    - helm lint k8s/charts/service -f k8s/values/cart-service.yaml
+    - helm template cart-service k8s/charts/service -f k8s/values/cart-service.yaml > /dev/null
     - helm template postgres k8s/infra/postgres > /dev/null
     - helm lint k8s/charts/service -f k8s/values/product-service.yaml
     - helm template product-service k8s/charts/service -f k8s/values/product-service.yaml > /dev/null
