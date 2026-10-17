@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     DATABASE_URL: str
     ADMIN_API_KEY: str = Field(min_length=16)
+    INTERNAL_API_KEY: str = Field(min_length=16)
 
 
 def load_settings() -> Settings:
