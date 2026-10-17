@@ -3,6 +3,7 @@ import os
 # Must be set before the app is imported. Tests never touch a real database.
 os.environ["DATABASE_URL"] = "sqlite+pysqlite:///:memory:"
 os.environ["ADMIN_API_KEY"] = "test-admin-key-0123456789abcdef"
+os.environ["INTERNAL_API_KEY"] = "test-internal-key-0123456789abcd"
 os.environ["LOG_LEVEL"] = "WARNING"
 
 from datetime import datetime, timezone  # noqa: E402
@@ -53,8 +54,13 @@ def admin_headers():
 
 
 @pytest.fixture()
+def internal_headers():
+    return {"X-Internal-Key": os.environ["INTERNAL_API_KEY"]}
+
+
+@pytest.fixture()
 def catalog(session_factory):
-    """2 categories and 5 products with fixed dates and prices."""
+    """2 categories and 5 products with fixed dates and prices (stock 10 each)."""
     with session_factory() as db:
         boards = Category(name="Boards", slug="boards")
         sensors = Category(name="Sensors", slug="sensors")

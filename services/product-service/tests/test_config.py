@@ -18,3 +18,17 @@ def test_short_admin_key_is_rejected(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         load_settings()
     assert "too-short" not in str(exc.value)
+
+
+def test_missing_internal_key_fails_fast(monkeypatch):
+    monkeypatch.delenv("INTERNAL_API_KEY", raising=False)
+    with pytest.raises(SystemExit) as exc:
+        load_settings()
+    assert "INTERNAL_API_KEY" in str(exc.value)
+
+
+def test_short_internal_key_is_rejected(monkeypatch):
+    monkeypatch.setenv("INTERNAL_API_KEY", "too-short")
+    with pytest.raises(SystemExit) as exc:
+        load_settings()
+    assert "too-short" not in str(exc.value)
