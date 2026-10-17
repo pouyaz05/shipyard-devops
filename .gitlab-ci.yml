@@ -286,6 +286,8 @@ cart-service:deploy-production:
 frontend:test:
   stage: test
   image: node:20-alpine
+  variables:
+    npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
   cache:
     key:
       files:
@@ -296,6 +298,7 @@ frontend:test:
     - cd frontend
     - npm ci
     - npm test
+    - npm run build
   rules:
     - changes: *changes-frontend
 
