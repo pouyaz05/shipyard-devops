@@ -3,6 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { vi } from "vitest";
 import App from "../App";
 import { AuthProvider } from "../auth/AuthContext";
+import { CartProvider } from "../cart/CartContext";
 
 export function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -23,7 +24,9 @@ export function renderApp(route = "/") {
   return render(
     <MemoryRouter initialEntries={[route]}>
       <AuthProvider>
-        <App />
+        <CartProvider>
+          <App />
+        </CartProvider>
       </AuthProvider>
     </MemoryRouter>,
   );

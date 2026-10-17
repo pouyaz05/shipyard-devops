@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Product } from "../api/products";
+import AddToCartButton from "../cart/AddToCartButton";
 import { formatCents } from "../lib/money";
 import StockBadge from "./StockBadge";
 
@@ -13,7 +14,7 @@ export default function ProductCard({ product }: { product: Product }) {
         >
           {product.name.charAt(0).toUpperCase()}
         </div>
-        <div className="flex flex-1 flex-col gap-1 p-4">
+        <div className="flex flex-1 flex-col gap-1 p-4 pb-3">
           {product.category && (
             <span className="text-xs uppercase tracking-wide text-slate-500">
               {product.category.name}
@@ -26,6 +27,9 @@ export default function ProductCard({ product }: { product: Product }) {
           </div>
         </div>
       </Link>
+      <div className="px-4 pb-4">
+        <AddToCartButton product={product} />
+      </div>
     </li>
   );
 }

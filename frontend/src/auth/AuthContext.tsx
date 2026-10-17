@@ -9,6 +9,7 @@ import {
 } from "react";
 import { ApiError, api, clearToken, getToken, saveToken } from "../api/client";
 import type { RegisterInput, TokenResponse, User } from "../api/types";
+import { fetchMe, updateMyName } from "../api/user";
 
 interface AuthContextValue {
   user: User | null;
@@ -17,6 +18,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
+  updateName: (fullName: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -26,15 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(() => getToken() !== null);
 
-  // On app load: if a token exists, validate it with /users/me.
+  // On app load: if a token exists, validate it (and read the role) with /users/me.
   useEffect(() => {
     if (!getToken()) {
       setIsLoading(false);
       return;
     }
     let cancelled = false;
-    api
-      .get<User>("/users/me", { auth: true })
+    fetchMe()
       .then((me) => {
         if (!cancelled) setUser(me);
       })
@@ -57,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { access_token } = await api.post<TokenResponse>("/auth/login", { email, password });
     saveToken(access_token);
     try {
-      const me = await api.get<User>("/users/me", { auth: true });
+      const me = await fetchMe();
       setToken(access_token);
       setUser(me);
     } catch (err) {
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (input: RegisterInput) => {
-      await api.post<User>("/auth/register", input);
+      await api.post<unknown>("/auth/register", input);
       await login(input.email, input.password);
     },
     [login],
@@ -80,9 +81,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const updateName = useCallback(async (fullName: string) => {
+    const saved = await updateMyName(fullName);
+    setUser((prev) => (prev ? { ...prev, full_name: saved } : prev));
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, token, isLoading, login, register, logout }),
-    [user, token, isLoading, login, register, logout],
+    () => ({ user, token, isLoading, login, register, logout, updateName }),
+    [user, token, isLoading, login, register, logout, updateName],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

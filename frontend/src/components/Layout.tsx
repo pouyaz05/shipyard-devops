@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import CartLink from "../cart/CartLink";
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium hover:text-sky-600 ${
@@ -29,6 +30,17 @@ export default function Layout() {
             <NavLink to="/products" className={linkClass}>
               Products
             </NavLink>
+            {!isLoading && user && (
+              <NavLink to="/orders" className={linkClass}>
+                Orders
+              </NavLink>
+            )}
+            {!isLoading && user?.role === "admin" && (
+              <NavLink to="/admin" className={linkClass}>
+                Admin
+              </NavLink>
+            )}
+            <CartLink />
             {!isLoading &&
               (user ? (
                 <>

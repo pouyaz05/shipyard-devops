@@ -41,3 +41,31 @@ React 18, Vite, TypeScript, Tailwind, React Router, vitest. Dockerfile: multi-st
 - Prices are stored as integer cents (`price_cents`); the frontend formats them as dollars.
 - Frontend calls APIs only via relative paths (`/api/<service>/...`), never full URLs.
 - Auth token (from user-service) is validated by user-service only. Other services do not decode JWT yet.
+## Services registry (update)
+| cart-service | cart_db | /api/cart-service/ | cart-service-secret |
+
+## Conventions added in BE-4 / FE-4
+- Service-to-service calls use plain HTTP with a URL from env (e.g. PRODUCT_SERVICE_URL=http://product-service:8000), a 3s timeout, and return 502 with {"detail": "..."} when the other service fails.
+- JWT: issued only by user-service. cart-service may VERIFY tokens (same JWT_SECRET and algorithm from env, user id in the `sub` claim). No service issues tokens except user-service.
+- product-service is the source of truth for price and stock. Other services store only a snapshot (product_id, name, unit_price_cents) and never write to its database.
+- Money is always integer cents.
+
+| order-service | orders_db | /api/order-service/ | order-service-secret |
+
+## Conventions added in BE-5 / FE-5
+- Internal-only endpoints live under /internal/... (NOT /api/...), protected by header
+  X-Internal-Key (value from env INTERNAL_API_KEY). Ingress never routes /internal.
+- order-service forwards the user's Bearer token when calling cart-service.
+- Stock changes are atomic: UPDATE ... SET stock = stock - n WHERE id = X AND stock >= n.
+- If a multi-step operation fails midway, compensate (undo the earlier steps) and return a clear error.
+- Orders store an immutable snapshot of name, unit price and quantity. Later price changes never alter old orders.
+- Payment is simulated (no real gateway).
+## Roles and auth (BE-6)
+- JWT issued only by user-service. Claims: `sub` (user id), `role` ("user" or "admin"), `exp`.
+- Other services verify the JWT locally (same JWT_SECRET and algorithm from env) and read `role`.
+- Admin-only endpoints return 403 for non-admins and 401 without a token.
+- The temporary X-Admin-Key header is REMOVED (replaced by role=admin).
+- Admin users are created only by a manual script (scripts/make_admin.py), never via the public API.
+
+## Reviews (BE-7)
+- Reviews live in product-service. One review per user per product, rating 1 to 5.

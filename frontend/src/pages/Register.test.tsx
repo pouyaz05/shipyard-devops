@@ -39,7 +39,8 @@ describe("Register page", () => {
     await fillForm(user);
 
     expect(await screen.findByRole("heading", { name: "Your account" })).toBeInTheDocument();
-    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+    // Later calls (e.g. loading the cart) are not part of the registration flow.
+    expect(fetchMock.mock.calls.slice(0, 3).map(([url]) => String(url))).toEqual([
       "/api/user-service/auth/register",
       "/api/user-service/auth/login",
       "/api/user-service/users/me",
