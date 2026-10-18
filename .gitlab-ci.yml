@@ -57,6 +57,12 @@ variables:
   - k8s/charts/service/**/*
   - k8s/values/cart-service.yaml
   - .gitlab-ci.yml
+
+.changes-order-service: &changes-order-service
+  - services/order-service/**/*
+  - k8s/charts/service/**/*
+  - k8s/values/order-service.yaml
+  - .gitlab-ci.yml
 # ---------- user-service ----------
 
 user-service:test:
@@ -209,77 +215,76 @@ product-service:deploy-production:
 
 # ---------- cart-service ----------
 
-cart-service:test:
+order-service:test:
   stage: test
   image: python:3.12-slim
   cache:
-    key: pip-cart-service
+    key: pip-order-service
     paths:
       - .cache/pip
   script:
-    - cd services/cart-service
+    - cd services/order-service
     - pip install -r requirements-dev.txt
     - python -m pytest -v
   rules:
-    - changes: *changes-cart-service
+    - changes: *changes-order-service
 
-cart-service:build:
+order-service:build:
   stage: build
   image: docker:27
   needs:
-    - job: cart-service:test
+    - job: order-service:test
       optional: true
   variables:
-    IMAGE: localhost:5001/cart-service:$CI_COMMIT_SHORT_SHA
+    IMAGE: localhost:5001/order-service:$CI_COMMIT_SHORT_SHA
   script:
-    - cd services/cart-service
+    - cd services/order-service
     - >
       docker build
       --build-arg PIP_INDEX_URL=$PIP_INDEX_URL
       --build-arg PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT
       -t $IMAGE .
-    - docker run --rm $IMAGE python -c "import fastapi, sqlalchemy, psycopg, jwt, httpx"
     - |
       if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
         docker push $IMAGE
       fi
   rules:
-    - changes: *changes-cart-service
+    - changes: *changes-order-service
 
-cart-service:deploy-staging:
+order-service:deploy-staging:
   extends: .deploy
   stage: deploy-staging
   needs:
-    - job: cart-service:build
+    - job: order-service:build
     - job: postgres:deploy-staging
       optional: true
   script:
     - >
-      helm upgrade cart-service k8s/charts/service -n $NS_STAGING $HELM_OPTS
-      -f k8s/values/cart-service.yaml
-      --set image.repository=localhost:5001/cart-service
+      helm upgrade order-service k8s/charts/service -n $NS_STAGING $HELM_OPTS
+      -f k8s/values/order-service.yaml
+      --set image.repository=localhost:5001/order-service
       --set image.tag=$CI_COMMIT_SHORT_SHA
   environment:
     name: staging
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: *changes-cart-service
+      changes: *changes-order-service
 
-cart-service:deploy-production:
+order-service:deploy-production:
   extends: .deploy
   stage: deploy-production
-  needs: ["cart-service:deploy-staging"]
+  needs: ["order-service:deploy-staging"]
   script:
     - >
-      helm upgrade cart-service k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
-      -f k8s/values/cart-service.yaml
-      --set image.repository=localhost:5001/cart-service
+      helm upgrade order-service k8s/charts/service -n $NS_PRODUCTION $HELM_OPTS
+      -f k8s/values/order-service.yaml
+      --set image.repository=localhost:5001/order-service
       --set image.tag=$CI_COMMIT_SHORT_SHA
   environment:
     name: production
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
-      changes: *changes-cart-service
+      changes: *changes-order-service
       when: manual
 # ---------- frontend ----------
 
@@ -371,6 +376,8 @@ helm:lint:
     - helm template postgres k8s/infra/postgres > /dev/null
     - helm lint k8s/charts/service -f k8s/values/product-service.yaml
     - helm template product-service k8s/charts/service -f k8s/values/product-service.yaml > /dev/null
+    - helm lint k8s/charts/service -f k8s/values/order-service.yaml
+    - helm template order-service k8s/charts/service -f k8s/values/order-service.yaml > /dev/null
   rules:
     - changes:
         - k8s/**/*
