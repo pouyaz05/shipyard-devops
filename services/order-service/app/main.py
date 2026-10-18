@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.routers import health
+from app.routers import health, orders
 
 setup_logging(settings.LOG_LEVEL)
 logger = logging.getLogger("order-service")
@@ -20,3 +20,4 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="order-service", lifespan=lifespan)
 app.include_router(health.router)
+app.include_router(orders.router)

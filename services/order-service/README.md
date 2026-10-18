@@ -1,7 +1,32 @@
 # order-service
 
-Checkout and orders for Shipyard. Skeleton only for now: `/health`, `/ready`, config, models and the first migration.
-Order endpoints come in the next ticket.
+Checkout and orders for Shipyard. Every `/api/order-service/...` endpoint needs `Authorization: Bearer <token>`
+(tokens are issued by user-service, this service only verifies them).
+
+## Endpoints
+| Method | Path | Notes |
+|--------|------|-------|
+| GET | /health, /ready | no prefix; `/ready` returns 503 if the DB is down |
+| POST | /api/order-service/orders | body `{shipping_name, shipping_address, shipping_city}`; 201 with the order |
+| GET | /api/order-service/orders | own orders, newest first; `limit` (1 to 100, default 50) and `offset` |
+| GET | /api/order-service/orders/{id} | 404 if unknown or not yours |
+| POST | /api/order-service/orders/{id}/pay | simulated payment, `PENDING_PAYMENT` to `PAID`; 409 in any other state |
+
+Errors are always `{"detail": "..."}`. Money is integer cents. Statuses: `PENDING_PAYMENT`, `PAID`, `CANCELLED`
+(there is no cancel endpoint yet).
+
+## How POST /orders works
+1. Read the cart from cart-service with the user's own token. Empty cart: 400.
+2. Ask product-service for the current price and stock of every item. A price that differs from the cart
+   snapshot, a product that no longer exists or not enough stock: 409 with a clear message, nothing is changed.
+3. Decrement stock through `POST /internal/products/{id}/decrement`. If one item fails, the earlier ones are given
+   back with `/increment` (compensation) and the answer is 409 (502 if product-service is unreachable).
+4. Save the order and its items (an immutable snapshot of name, unit price and quantity) in one transaction.
+   If this fails, all stock is given back and the answer is 500.
+5. After the commit, clear the cart. If that fails only a warning is logged and the order stays valid.
+
+No HTTP call is ever made while a database transaction is open. Every call to another service has a 3 second
+timeout. A network error or an unexpected answer gives 502.
 
 ## Environment variables
 | Var | Default | Required | Notes |
@@ -18,7 +43,7 @@ Order endpoints come in the next ticket.
 The app exits at startup if a required variable is missing or invalid. Never commit real values.
 
 ## Tests
-No Postgres and no network: SQLite in memory. Run with Python 3.12:
+No Postgres and no network: SQLite in memory, cart-service and product-service are replaced by fakes. Python 3.12:
 ```bash
 docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD":/app -w /app python:3.12-slim sh -c \
   "pip install -q --no-cache-dir --default-timeout=120 -r requirements-dev.txt && python -m pytest -q -p no:cacheprovider"
