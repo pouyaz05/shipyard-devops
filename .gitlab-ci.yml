@@ -4,7 +4,6 @@ stages:
   - deploy-staging
   - deploy-production
 
-# فقط یک pipeline: برای MR یا برای push روی main (جلوگیری از pipeline دوگانه)
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -24,13 +23,12 @@ variables:
   NS_PRODUCTION: sy-production
   HELM_OPTS: "--install --rollback-on-failure --timeout 3m --force-conflicts"
 
-# ---------- قالب‌های مشترک ----------
+
 
 .deploy:
   image:
     name: alpine/helm:4.2.4
     entrypoint: [""]
-  # KUBECONFIG باید در Settings > CI/CD > Variables از نوع File تعریف شود
   before_script:
     - helm version --short
 
@@ -94,9 +92,9 @@ user-service:build:
       --build-arg PIP_INDEX_URL=$PIP_INDEX_URL
       --build-arg PIP_DEFAULT_TIMEOUT=$PIP_DEFAULT_TIMEOUT
       -t $IMAGE .
-    # smoke test: ایمیج ساخته شده باید بالا بیاید
+    
     - docker run --rm $IMAGE python -c "import app" || true
-    # push فقط روی main
+    
     - |
       if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
         docker push $IMAGE

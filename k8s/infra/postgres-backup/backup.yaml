@@ -62,4 +62,4 @@ spec:
           volumes:
             - name: backups
               persistentVolumeClaim:
-                claimName: pg-backups
+                claimName: pg-backups.

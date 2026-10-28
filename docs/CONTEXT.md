@@ -60,6 +60,10 @@ React 18, Vite, TypeScript, Tailwind, React Router, vitest. Dockerfile: multi-st
 - If a multi-step operation fails midway, compensate (undo the earlier steps) and return a clear error.
 - Orders store an immutable snapshot of name, unit price and quantity. Later price changes never alter old orders.
 - Payment is simulated (no real gateway).
+
+
+## Planned (not implemented yet)
+
 ## Roles and auth (BE-6)
 - JWT issued only by user-service. Claims: `sub` (user id), `role` ("user" or "admin"), `exp`.
 - Other services verify the JWT locally (same JWT_SECRET and algorithm from env) and read `role`.
