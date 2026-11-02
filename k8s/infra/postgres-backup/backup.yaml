@@ -21,9 +21,11 @@ spec:
   failedJobsHistoryLimit: 2
   jobTemplate:
     spec:
-      backoffLimit: 1
+      activeDeadlineSeconds: 900
+      backoffLimit: 3
       template:
-        spec:
+        spec: 
+          startingDeadlineSeconds: 21600
           restartPolicy: Never
           initContainers:
             - name: fix-perms
@@ -40,12 +42,13 @@ spec:
               args:
                 - |
                   set -euo pipefail
+                  until pg_isready -h postgres -U "$PGUSER" -t 5; do echo "waiting for postgres"; sleep 3; done
                   f=/backups/all-$(date +%F-%H%M).sql.gz
                   pg_dumpall -h postgres -U "$PGUSER" | gzip > "$f"
                   gzip -t "$f"
                   find /backups -name 'all-*.sql.gz' -mtime +7 -delete
                   ls -lh /backups
-              env:
+              env:  
                 - name: PGUSER
                   value: shipyard
                 - name: PGPASSWORD
