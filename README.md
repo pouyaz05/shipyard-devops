@@ -1,13 +1,24 @@
 # Shipyard
+
 [![CI](https://github.com/pouyaz05/shipyard/actions/workflows/ci.yml/badge.svg)](https://github.com/pouyaz05/shipyard/actions/workflows/ci.yml)
 
 An online shop for electronic parts (ESP32 boards, sensors, modules), built as a small microservice system to practice the whole delivery path: **containers → CI → Helm → Kubernetes**.
 
 > Portfolio project. The shop features are deliberately small; the focus is on how the system is built, tested, packaged and deployed.
 
+## Highlights
+
+- Four FastAPI services and a React frontend, with **one database per service**
+- **One generic Helm chart** reused by every service; each service is only a values file
+- GitLab CI/CD: automatic staging deploy, manual production gate, **automatic rollback** when a release does not become ready
+- Database migrations as Helm hook Jobs, and a nightly Postgres backup whose restore was tested
+- One-command local stack with Docker Compose and a scripted end-to-end purchase test
+
 ## Features
 
 Browse and search products, register and log in (JWT), cart, checkout with stock reservation, order history and a simulated payment.
+
+![Shop](docs/img/shop.jpg)
 
 ## Architecture
 
@@ -57,9 +68,14 @@ make logs    # follow logs
 make down    # stop (keeps data)   |   make clean  # stop and delete data
 ```
 
-If port 8080 is busy, set `GATEWAY_PORT` in `.env`. On a restricted network, set `PIP_INDEX_URL` and `NPM_CONFIG_REGISTRY` to a mirror (see `.env.example`).
-
 The Compose file mirrors the cluster layout: a small nginx gateway plays the Ingress, and each service has a one-shot `*-migrate` container (`alembic upgrade head`) that must finish before the app starts.
+
+### Troubleshooting
+
+- **`pip` or `npm` times out during `make up`:** set a mirror in `.env`, for example `PIP_INDEX_URL=<mirror>/simple`, `PIP_DEFAULT_TIMEOUT=120` and `NPM_CONFIG_REGISTRY=<mirror>`, then run `make up` again (finished layers are cached).
+- **Port 8080 is busy:** set `GATEWAY_PORT` in `.env`.
+- **`make seed` says a service is not running:** check `make ps` and `make logs`.
+- **Start from scratch:** `make clean && make up`.
 
 ## CI/CD
 
@@ -68,6 +84,9 @@ The Compose file mirrors the cluster layout: a small nginx gateway plays the Ing
 ```
 test → build (+ push) → deploy-staging (automatic) → deploy-production (manual)
 ```
+
+![GitLab pipeline](docs/img/gitlab-pipeline.jpg)
+*Tests, image builds and the staging deploy run automatically; the production jobs wait for a manual approval.*
 
 - Pipelines run only for merge requests and for `main`.
 - Each service has its own jobs, triggered by `rules: changes` on its code, the shared chart and its values file.
@@ -81,7 +100,7 @@ test → build (+ push) → deploy-staging (automatic) → deploy-production (ma
 
 - `k8s/charts/service`: one generic chart for every stateless app (Deployment, Service, Ingress, optional HPA, ServiceAccount, migration Job). Each service is just a values file in `k8s/values/`.
 - `k8s/infra/postgres`: PostgreSQL as a StatefulSet with a persistent volume.
-- A nightly `pg_dumpall` CronJob; restores were tested.
+- `k8s/infra/postgres-backup`: nightly `pg_dumpall` CronJob; restores were tested. The job waits for Postgres to be reachable and may start up to six hours late, because a laptop cluster is not always on.
 - Secrets are created out of band with `kubectl` and are never committed. Each values file lists the Secret it consumes under `secretRefs`; the required keys are the variables in `docker-compose.yml`.
 
 ```bash
@@ -90,6 +109,9 @@ helm upgrade --install cart-service k8s/charts/service -n sy \
   --set image.repository=<registry>/cart-service --set image.tag=<git-sha> \
   --rollback-on-failure
 ```
+
+![Cluster](docs/img/cluster.jpg)
+*Six workloads on a single-node kind cluster, deployed with Helm. The restart counters come from suspending and rebooting the laptop.*
 
 Tested on a single-node kind cluster. The production jobs exist in the pipeline but are manual, and no separate production namespace is provisioned in my setup; staging is the `sy` namespace.
 
@@ -121,7 +143,7 @@ frontend/          React app and nginx config
 k8s/               generic chart, per-service values, infrastructure charts
 docker/            gateway and database init for Docker Compose
 scripts/           end-to-end test
-docs/              project conventions
+docs/              project conventions and screenshots
 ```
 
 ## License

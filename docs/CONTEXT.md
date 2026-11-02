@@ -70,6 +70,5 @@ React 18, Vite, TypeScript, Tailwind, React Router, vitest. Dockerfile: multi-st
 - Admin-only endpoints return 403 for non-admins and 401 without a token.
 - The temporary X-Admin-Key header is REMOVED (replaced by role=admin).
 - Admin users are created only by a manual script (scripts/make_admin.py), never via the public API.
-
 ## Reviews (BE-7)
 - Reviews live in product-service. One review per user per product, rating 1 to 5.

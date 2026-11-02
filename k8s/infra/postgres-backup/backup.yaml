@@ -17,15 +17,16 @@ metadata:
 spec:
   schedule: "0 2 * * *"
   concurrencyPolicy: Forbid
+  # If the machine was off at 02:00, still run when it comes back (within 6 hours).
+  startingDeadlineSeconds: 21600
   successfulJobsHistoryLimit: 2
   failedJobsHistoryLimit: 2
   jobTemplate:
     spec:
-      activeDeadlineSeconds: 900
       backoffLimit: 3
+      activeDeadlineSeconds: 1200
       template:
-        spec: 
-          startingDeadlineSeconds: 21600
+        spec:
           restartPolicy: Never
           initContainers:
             - name: fix-perms
@@ -42,13 +43,18 @@ spec:
               args:
                 - |
                   set -euo pipefail
-                  until pg_isready -h postgres -U "$PGUSER" -t 5; do echo "waiting for postgres"; sleep 3; done
+                  # After a reboot DNS and Postgres can take a few minutes to come back: wait up to 10 minutes.
+                  for i in $(seq 1 120); do
+                    pg_isready -h postgres -U "$PGUSER" -t 5 && break
+                    echo "waiting for postgres ($i/120)"; sleep 5
+                  done
+                  pg_isready -h postgres -U "$PGUSER" -t 5
                   f=/backups/all-$(date +%F-%H%M).sql.gz
                   pg_dumpall -h postgres -U "$PGUSER" | gzip > "$f"
                   gzip -t "$f"
                   find /backups -name 'all-*.sql.gz' -mtime +7 -delete
                   ls -lh /backups
-              env:  
+              env:
                 - name: PGUSER
                   value: shipyard
                 - name: PGPASSWORD
@@ -65,4 +71,4 @@ spec:
           volumes:
             - name: backups
               persistentVolumeClaim:
-                claimName: pg-backups.
+                claimName: pg-backups
